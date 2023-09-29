@@ -159,4 +159,9 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 .idea/
 LDN_data_*
+model
+trained_models
+save_model
+runs
+
 
