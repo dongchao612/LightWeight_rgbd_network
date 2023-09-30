@@ -58,10 +58,15 @@ def compute_speed_one(model, rgb_size, device, iteration=100):
 
     speed_time = elapsed_time / iteration * 1000
     fps = iteration / elapsed_time
+    total = sum([param.nelement() for param in model.parameters()])
 
     print('Elapsed Time: [%.2f s / %d iter]' % (elapsed_time, iteration))
     print('Speed Time: %.2f ms / iter   FPS: %.2f' % (speed_time, fps))
+    print("Number of parameter: %.2fM" % (total / 1e6))
+    print('==============================')
+
     return speed_time, fps
+
 
 def compute_speed_two(model, rgb_size, depth_size, device, iteration=100):
     torch.cuda.set_device(device)
@@ -87,23 +92,21 @@ def compute_speed_two(model, rgb_size, depth_size, device, iteration=100):
 
     speed_time = elapsed_time / iteration * 1000
     fps = iteration / elapsed_time
+    total = sum([param.nelement() for param in model.parameters()])
 
     print('Elapsed Time: [%.2f s / %d iter]' % (elapsed_time, iteration))
     print('Speed Time: %.2f ms / iter   FPS: %.2f' % (speed_time, fps))
+    print("NonBottleneck1D Number of parameter: %.2fM" % (total / 1e6))
+    print('==============================')
+
     return speed_time, fps
 
 
-def print_log(epoch, local_count, count_inter, dataset_size, loss, time_inter,
-              learning_rates):
-    print_string = 'Train Epoch: {:>3} [{:>4}/{:>4} ({: 5.1f}%)]'.format(
-        epoch, local_count, dataset_size,
-        100. * local_count / dataset_size)
-    for i, lr in enumerate(learning_rates):
-        print_string += '   lr_{}: {:>6}'.format(i, round(lr, 10))
-    print_string += '   Loss: {:0.6f}'.format(loss.item())
-    print_string += '  [{:0.2f}s every {:>4} data]'.format(time_inter,
-                                                          count_inter)
-    print(print_string, flush=True)
+def print_log(global_step, epoch, local_count, count_inter, dataset_size, loss, time_inter):
+    print('Step: {:>5} Train Epoch: {:>3} [{:>4}/{:>4} ({:3.1f}%)]    '
+          'Loss: {:.6f} [{:.2f}s every {:>4} data]'.format(
+        global_step, epoch, local_count, dataset_size,
+        100. * local_count / dataset_size, loss.data, time_inter, count_inter))
 
 
 def save_ckpt(ckpt_dir, model, optimizer, epoch):
@@ -164,7 +167,6 @@ def load_ckpt(model, optimizer, model_file, device):
     else:
         print("=> no checkpoint found at '{}'".format(model_file))
         sys.exit(1)
-
 
 
 def color_label(label):

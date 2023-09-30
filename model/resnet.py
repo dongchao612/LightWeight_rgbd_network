@@ -18,8 +18,6 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-
-
 from model.net_part import conv1x1, BasicBlock, Bottleneck, NonBottleneck1D
 
 
@@ -149,11 +147,14 @@ class ResNet(nn.Module):
         if self.replace_stride_with_dilation == [False, False, False]:
             features = [x_layer4, x_layer3, x_layer2, x_layer1]
             # print(x_layer1.size(),x_layer2.size(),x_layer3.size(),x_layer4.size())
+
+            self.skip4_channels = x_layer4.size()[1]
             self.skip3_channels = x_layer3.size()[1]
             self.skip2_channels = x_layer2.size()[1]
             self.skip1_channels = x_layer1.size()[1]
-            # print(self.skip1_channels, self.skip2_channels, self.skip3_channels)
-            # 64 128 256
+
+            # print(self.skip1_channels, self.skip2_channels, self.skip3_channels,self.skip4_channels)
+            # 64 128 256 512
 
         elif self.replace_stride_with_dilation == [False, True, True]:
             # x has resolution 1/8
@@ -344,8 +345,8 @@ def load_pretrained_with_different_encoder_block(
     if input_channels == 1:
         # sum the weights of the first convolution
         weights['encoder_depth.conv1.weight'] = torch.sum(weights['encoder_depth.conv1.weight'],
-                                            dim=1,
-                                            keepdim=True)
+                                                          dim=1,
+                                                          keepdim=True)
 
     model.load_state_dict(weights, strict=False)
     print('Loaded {} with encoder block   {}pretrained on ImageNet'.format(resnet_name, encoder_block))
@@ -357,77 +358,19 @@ if __name__ == '__main__':
     image_h, image_w = 480, 640
     batch_size = 3
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    # print(device)
-    #
-    # print("r18 ")
-    # model18 = ResNet18(block='BasicBlock', pretrained_on_imagenet=True,
-    #                   dilation=[1]*4)
-    # compute_speed_one(model18, (batch_size, 3, image_h, image_w), device, 10)
-    # total = sum([param.nelement() for param in model18.parameters()])
-    # print("Number of parameter: %.2fM" % (total / 1e6))
-    #
-    # model18 = ResNet18(block='Bottleneck', pretrained_on_imagenet=True,
-    #                   dilation=[1]*4)
-    # compute_speed_one(model18, (batch_size, 3, image_h, image_w), device, 10)
-    # total = sum([param.nelement() for param in model18.parameters()])
-    # print("Number of parameter: %.2fM" % (total / 1e6))
-    #
-    # model18 = ResNet18(block='NonBottleneck1D', pretrained_on_imagenet=True,
-    #                   dilation=[1]*4)
-    # compute_speed_one(model18, (batch_size, 3, image_h, image_w), device, 10)
-    # total = sum([param.nelement() for param in model18.parameters()])
-    # print("Number of parameter: %.2fM" % (total / 1e6))
 
-    # print("r34 ")
-    ##  Bottleneck NonBottleneck1Dto load r34_NBt1D
-    ##  BasicBlock to load resnet34-333f7ec4
-
-    # model34 = ResNet34(block='BasicBlock', pretrained_on_imagenet=True,
-    #                    dilation=[1] * 4, pretrained_dir="../trained_models")
-    # compute_speed_one(model34, (batch_size, 3, image_h, image_w), device, 10)
-    # total = sum([param.nelement() for param in model34.parameters()])
-    # print("BasicBlock Number of parameter: %.2fM" % (total / 1e6))
-    #
-    # model34 = ResNet34(block='Bottleneck', pretrained_on_imagenet=True,
-    #                    dilation=[1] * 4, pretrained_dir="../trained_models")
-    # compute_speed_one(model34, (batch_size, 3, image_h, image_w), device, 10)
-    # total = sum([param.nelement() for param in model34.parameters()])
-    # print("Bottleneck Number of parameter: %.2fM" % (total / 1e6))
-    #
     model34 = ResNet34(block='NonBottleneck1D', pretrained_on_imagenet=True,
                        dilation=[1] * 4, pretrained_dir="../trained_models")
     compute_speed_one(model34, (batch_size, 3, image_h, image_w), device, 10)
-    total = sum([param.nelement() for param in model34.parameters()])
-    print("NonBottleneck1D Number of parameter: %.2fM" % (total / 1e6))
-    #
-    # print("r50 ")
-    # model50 = ResNet50(block='BasicBlock', pretrained_on_imagenet=False,
-    #                   dilation=[1]*4)
-    # compute_speed_one(model50, (batch_size, 3, image_h, image_w), device, 10)
-    # total = sum([param.nelement() for param in model50.parameters()])
-    # print("Number of parameter: %.2fM" % (total / 1e6))
-    #
-    # model50 = ResNet50(block='Bottleneck', pretrained_on_imagenet=False,
-    #                   dilation=[1]*4)
-    # compute_speed_one(model50, (batch_size, 3, image_h, image_w), device, 10)
-    # total = sum([param.nelement() for param in model50.parameters()])
-    # print("Number of parameter: %.2fM" % (total / 1e6))
 
-    # model50 = ResNet50(block='NonBottleneck1D', pretrained_on_imagenet=False,
-    #                   dilation=[1]*4)
-    # compute_speed_one(model50, (batch_size, 3, image_h, image_w), device, 10)
-    # total = sum([param.nelement() for param in model50.parameters()])
-    # print("Number of parameter: %.2fM" % (total / 1e6))
-
-    # BasicBlock+True   resnet34-333f7ec4
-    model34 = ResNet34(block='NonBottleneck1D', pretrained_on_imagenet=True,
-                       dilation=[1] * 4, pretrained_dir="../trained_models")
-    x = torch.randn(batch_size, 3, image_h, image_w)
-    for i in model34(x):
-        print(i.shape)
     '''
-    torch.Size([3, 512, 15, 20])
-    torch.Size([3, 256, 30, 40])
-    torch.Size([3, 128, 60, 80])
-    torch.Size([3, 64, 120, 160])
+    =========Speed Testing=========
+    Elapsed Time: [0.15 s / 10 iter]
+    Speed Time: 15.32 ms / iter   FPS: 65.27
+    NonBottleneck1D Number of parameter: 14.79M
+    ==============================
+    512, 15, 20
+    256, 30, 40
+    128, 60, 80
+    64, 120, 160
     '''

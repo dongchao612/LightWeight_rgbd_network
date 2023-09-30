@@ -56,7 +56,7 @@ parser.add_argument('--cuda', action='store_true', default=True,
                     help='enables CUDA training')
 parser.add_argument('-j', '--workers', default=0, type=int, metavar='N',
                     help='number of data loading workers (default: 8)')
-parser.add_argument('--epochs', default=50, type=int, metavar='N',
+parser.add_argument('--epochs', default=10, type=int, metavar='N',
                     help='number of total epochs to run (default: 1500)')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
@@ -68,7 +68,7 @@ parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)')
 parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
-parser.add_argument('--print-freq', '-p', default=50, type=int,
+parser.add_argument('--print-freq', '-p', default=100, type=int,
                     metavar='N', help='print batch frequency (default: 50)')
 parser.add_argument('--save-epoch-freq', '-s', default=5, type=int,
                     metavar='N', help='save epoch frequency (default: 5)')
@@ -99,15 +99,15 @@ def train():
 
     train_data =SUNRGBD(phase_train=True, data_dir=args.data_dir, transform=LDN_transform)
     train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True,
-                              num_workers=args.workers, pin_memory=False)
+                              num_workers=args.workers, pin_memory=False,drop_last=True)
 
     num_train = len(train_data)  # 5285
-
 
     model = LDNNet(
         height=image_h,
         width=image_w,
-        fuse_depth_in_rgb_encoder="add",
+        fuse_depth_in_rgb_encoder="SE-add",  # add or SE-add
+        encoder_decoder_fusion="add",  # add or None
         encoder_rgb='resnet34',
         encoder_depth='resnet34',
         encoder_block='NonBottleneck1D', pretrained_on_imagenet=True, pretrained_dir="trained_models")
@@ -144,10 +144,14 @@ def train():
             image = sample['image'].to(device)
             depth = sample['depth'].to(device)
             target = sample['label'].to(device)
-
+            # print(image.shape,depth.shape,target.shape)
+            # torch.Size([2, 3, 480, 640]) torch.Size([2, 1, 480, 640]) torch.Size([2, 480, 640])
             optimizer.zero_grad()
-            pred = model(image, depth, args.checkpoint)
+            pred = model(image, depth)
+            # print(pred[0].shape)
+            # torch.Size([2, 37, 480, 640])
             loss = CEL_weighted(pred, target)
+            loss = sum(loss)
             loss.backward()
             optimizer.step()
             local_count += image.data.shape[0]
@@ -167,7 +171,7 @@ def train():
                 grid_image = make_grid(depth[:3].clone().cpu().data, 3, normalize=True)
                 writer.add_image('depth', grid_image, global_step)
 
-                grid_image = make_grid(utils.color_label(torch.max(pred[:3], 1)[1] + 1), 3, normalize=True,
+                grid_image = make_grid(utils.color_label(torch.max(pred[0][:3], 1)[1] + 1), 3, normalize=True,
                                        range=(0, 255))
                 writer.add_image('Predicted label', grid_image, global_step)
 
@@ -186,8 +190,6 @@ def train():
 if __name__ == '__main__':
     if not os.path.exists(args.ckpt_dir):
         os.mkdir(args.ckpt_dir)
-
-
     train()
 
 
